@@ -6,3 +6,8 @@ dependencies = []
 
 [dependency-groups]
 dev = ["pytest"]
+
+# No build backend: the package is not installed, so tell pytest where it lives.
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
