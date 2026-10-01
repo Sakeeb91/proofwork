@@ -103,6 +103,25 @@ theorem orderOf_five : orderOf (5 : ZMod P) = P - 1 :=
   orderOf_eq_of_pow_and_pow_div_prime (by norm_num) five_pow_P_sub_one
     fun _ hq h => five_pow_div_prime_ne_one hq h
 
+/-! ### Roots of unity -/
+
+/-- For every n dividing p - 1, the element w_n = 5^((p-1)/n) has order
+exactly n.
+
+    order(g^k) = order(g) / gcd(order(g), k)
+
+Intuition: g walks around a cycle of length p - 1. Taking steps of size
+k = (p-1)/n, you return to the start after exactly n steps, because k
+divides the cycle length. This is `primitive_root_of_unity` in the Python. -/
+theorem orderOf_rootOfUnity {n : ℕ} (hn : n ∣ P - 1) :
+    orderOf ((5 : ZMod P) ^ ((P - 1) / n)) = n := by
+  have hP : P - 1 ≠ 0 := by norm_num
+  have hk : (P - 1) / n ≠ 0 :=
+    (Nat.div_pos (Nat.le_of_dvd (Nat.pos_of_ne_zero hP) hn)
+      (Nat.pos_of_dvd_of_pos hn (Nat.pos_of_ne_zero hP))).ne'
+  rw [orderOf_pow' _ hk, orderOf_five, Nat.gcd_eq_right (Nat.div_dvd_of_dvd hn),
+    Nat.div_div_self hn hP]
+
 /-! ### Shared test vector
 
 The same value is asserted in `tests/test_field.py`
