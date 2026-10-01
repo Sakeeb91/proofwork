@@ -214,3 +214,56 @@ def test_negative_exponent_is_power_of_the_inverse():
 def test_zero_to_a_negative_power_raises():
     with pytest.raises(ZeroDivisionError):
         FieldElement.zero() ** -1
+
+
+# --- multiplicative structure: generator and roots of unity ----------------
+
+
+def test_group_order_factors_as_3_times_2_to_30():
+    assert P - 1 == 3 * 2**30
+
+
+def test_generator_has_full_order():
+    # g generates all p - 1 nonzero elements iff its order is exactly p - 1.
+    # The order divides p - 1 = 3 * 2^30, so it is enough to rule out the
+    # maximal proper divisors (p-1)/2 and (p-1)/3.
+    g = FieldElement.generator()
+    assert g ** (P - 1) == FieldElement.one()
+    assert g ** ((P - 1) // 2) != FieldElement.one()
+    assert g ** ((P - 1) // 3) != FieldElement.one()
+
+
+@pytest.mark.parametrize("log_n", [0, 1, 2, 3, 10, 30])
+def test_root_of_unity_has_exact_order_n(log_n):
+    n = 2**log_n
+    w = FieldElement.primitive_root_of_unity(n)
+    assert w**n == FieldElement.one()
+    if n > 1:
+        # n is a power of two, so every proper divisor of n divides n/2.
+        assert w ** (n // 2) != FieldElement.one()
+
+
+def test_root_of_unity_powers_are_n_distinct_elements():
+    # The subgroup {1, w, w^2, ..., w^(n-1)} is a future evaluation domain.
+    n = 1024
+    w = FieldElement.primitive_root_of_unity(n)
+    assert len({w**i for i in range(n)}) == n
+
+
+def test_square_of_2n_th_root_is_the_n_th_root():
+    # Domains nest: halving the order is squaring. FRI relies on this.
+    w16 = FieldElement.primitive_root_of_unity(16)
+    assert w16 * w16 == FieldElement.primitive_root_of_unity(8)
+
+
+def test_root_of_unity_supports_orders_with_the_factor_3():
+    w = FieldElement.primitive_root_of_unity(3 * 2**10)
+    assert w ** (3 * 2**10) == FieldElement.one()
+    assert w ** (3 * 2**9) != FieldElement.one()
+    assert w ** (2**10) != FieldElement.one()
+
+
+@pytest.mark.parametrize("n", [0, -4, 5, 2**31, 9])
+def test_root_of_unity_rejects_orders_not_dividing_p_minus_1(n):
+    with pytest.raises(ValueError):
+        FieldElement.primitive_root_of_unity(n)

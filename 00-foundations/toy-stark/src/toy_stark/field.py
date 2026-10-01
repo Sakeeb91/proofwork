@@ -22,6 +22,12 @@ from __future__ import annotations
 # two, which later gives us evaluation domains of size 2^k for every k <= 30.
 P = 3 * 2**30 + 1
 
+# A generator of the multiplicative group F_p^* = F_p minus {0}: every
+# nonzero element is a power of it. The tests verify this rather than trust
+# it: the order of g divides p - 1 = 3 * 2^30, and g^((p-1)/2) != 1 and
+# g^((p-1)/3) != 1 rule out every proper divisor.
+GENERATOR = 5
+
 
 class FieldElement:
     """One element of F_p, stored as its canonical representative in [0, p)."""
@@ -47,6 +53,29 @@ class FieldElement:
     def one() -> FieldElement:
         """Multiplicative identity: a * 1 = a."""
         return FieldElement(1)
+
+    @staticmethod
+    def generator() -> FieldElement:
+        """A generator g of F_p^*: its powers g^0, ..., g^(p-2) hit every nonzero element."""
+        return FieldElement(GENERATOR)
+
+    # An n-th root of unity is w with w^n = 1. It is primitive if no smaller
+    # positive power is 1, so that 1, w, w^2, ..., w^(n-1) are n distinct
+    # points. For any n dividing p - 1:
+    #
+    #     w = g^((p-1)/n)
+    #
+    # Intuition: g walks once around all p - 1 nonzero elements. Taking
+    # steps of size (p-1)/n makes the walk close up after exactly n steps.
+    # These n points are the discrete analogue of the n-th roots of unity
+    # e^(2 pi i k / n) on the complex unit circle, and they are the
+    # evaluation domains for the FFT and FRI later. p - 1 = 3 * 2^30 means
+    # power-of-two domains exist up to size 2^30.
+    @staticmethod
+    def primitive_root_of_unity(n: int) -> FieldElement:
+        if n <= 0 or (P - 1) % n != 0:
+            raise ValueError(f"no primitive {n}-th root of unity: n must divide p - 1 = 3 * 2^30")
+        return FieldElement.generator() ** ((P - 1) // n)
 
     def is_zero(self) -> bool:
         return self._value == 0
