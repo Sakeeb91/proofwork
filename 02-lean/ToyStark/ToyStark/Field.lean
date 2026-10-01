@@ -132,4 +132,16 @@ disagree about arithmetic in F_p, one of the two checks fails.
 /-- 5^1000 = 80135535 in F_p. -/
 theorem five_pow_1000 : (5 : ZMod P) ^ 1000 = 80135535 := by reduce_mod_char
 
+/-- g = 5^(3 * 2^20) = 1855261384 generates the trace domain of size 1024
+(note (p-1)/1024 = 3 * 2^20). Asserted in `tests/test_domain.py`. -/
+theorem g_trace_value : (5 : ZMod P) ^ ((P - 1) / 1024) = 1855261384 := by reduce_mod_char
+
+/-- h = 5^((p-1)/8192) = 1734477367 generates the group whose coset is the
+evaluation domain of size 8192. Asserted in `tests/test_domain.py`. -/
+theorem h_eval_value : (5 : ZMod P) ^ ((P - 1) / 8192) = 1734477367 := by reduce_mod_char
+
+/-- The trace-domain generator has order exactly 1024. -/
+example : orderOf ((5 : ZMod P) ^ ((P - 1) / 1024)) = 1024 :=
+  orderOf_rootOfUnity (by norm_num)
+
 end ToyStark
