@@ -54,7 +54,7 @@ def test_modulus_is_prime():
 
 
 def test_miller_rabin_helper_rejects_composites():
-    # Guard the guard: 3 * 2^30 + 3 is even, 2^32 + 1 = 641 * 6700417.
+    # Guard the guard: p + 2 = 3 * (2^30 + 1), and 2^32 + 1 = 641 * 6700417.
     assert not is_prime_miller_rabin(P + 2)
     assert not is_prime_miller_rabin(641 * 6700417)
 
