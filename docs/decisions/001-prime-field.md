@@ -32,9 +32,8 @@ checked by `tests/test_field.py`, not assumed.
 
 ## Consequences
 - Intermediate values can be compared directly against STARK 101.
-- A 32-bit field is far too small for real soundness. Random verifier
-  challenges drawn from it give roughly 32 bits of security per challenge at
-  best. Acceptable for a toy; a real system would use a larger field or an
-  extension field. Revisit if the toy grows a soundness analysis.
+- The field has only about 2^32 elements, so verifier challenges are drawn
+  from a small set. No security level is claimed for the toy. Revisit, with
+  sources, if it grows a soundness analysis.
 - Pure Python object-per-element arithmetic is slow. Acceptable for a
   Fibonacci trace of about a thousand rows.

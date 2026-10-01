@@ -103,8 +103,6 @@ Added by Sakeeb during these sessions:
 - The notebook's SHA-256 checks on the extension are not reproduced; they
   need StarkWare's serialisation and belong with the Merkle and channel
   work.
-- ADR 001 contains one line of unsourced reasoning ("roughly 32 bits of
-  security per challenge at best").
 - `02-lean/README.md` has no ArkLib fork link yet.
 - Mathlib is pinned at a release candidate, `v4.35.0-rc3`.
 - No CI.
