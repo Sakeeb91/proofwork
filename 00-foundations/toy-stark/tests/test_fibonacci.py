@@ -88,10 +88,14 @@ def test_low_degree_extension_determines_the_polynomial():
 def test_low_degree_extension_rejects_a_domain_too_small_for_the_degree():
     # With size <= deg f the values no longer determine f, so it is not an
     # extension of anything.
-    f = trace_polynomial(fibonacci_sq_trace(F(2), 7), subgroup(8))
-    assert f.degree() >= 4
+    from toy_stark.polynomial import Polynomial
+
+    degree_4 = Polynomial([F(1)] * 5)
+    degree_3 = Polynomial([F(1)] * 4)
     with pytest.raises(ValueError):
-        low_degree_extension(f, 4)
+        low_degree_extension(degree_4, 4)  # deg = size: 4 values, 5 unknowns
+    domain, values = low_degree_extension(degree_3, 4)  # deg = size - 1 is fine
+    assert len(values) == 4
 
 
 # --- full size: STARK 101's numbers ----------------------------------------
@@ -132,8 +136,7 @@ def test_full_low_degree_extension_matches_independent_evaluation(full_trace_pol
     # Domain order: domain[i] = 5 * h^i, h the generator proved in Lean.
     h = 1734477367
     assert all(domain[i].value == 5 * pow(h, i, P) % P for i in range(8192))
-    # Values: checked against integer arithmetic at indices spread over the
-    # whole array, including both ends.
+    # Values: every one of the 8192, against plain integer arithmetic. A
+    # sample would let a single corrupted value through.
     coeffs = [c.value for c in f.coefficients]
-    for i in [*range(0, 8192, 97), 8191]:
-        assert values[i].value == horner_mod_p(coeffs, domain[i].value)
+    assert [v.value for v in values] == [horner_mod_p(coeffs, x.value) for x in domain]
