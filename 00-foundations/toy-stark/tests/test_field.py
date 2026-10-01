@@ -267,3 +267,18 @@ def test_root_of_unity_supports_orders_with_the_factor_3():
 def test_root_of_unity_rejects_orders_not_dividing_p_minus_1(n):
     with pytest.raises(ValueError):
         FieldElement.primitive_root_of_unity(n)
+
+
+# --- agreement with the Lean model -----------------------------------------
+
+
+def test_matches_lean_test_vector():
+    # These values are theorems in 02-lean/ToyStark/ToyStark/Field.lean
+    # (five_pow_1000, five_pow_half, five_pow_third), proved about Mathlib's
+    # ZMod P. A Lean proof says nothing about this Python code directly, so
+    # shared values are the link: if the two models of F_p ever disagree,
+    # this test or the Lean build fails.
+    g = FieldElement.generator()
+    assert g**1000 == FieldElement(80135535)
+    assert g ** ((P - 1) // 2) == -FieldElement.one()
+    assert g ** ((P - 1) // 3) == FieldElement(1610563584)
