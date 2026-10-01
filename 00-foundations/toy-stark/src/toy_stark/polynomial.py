@@ -95,3 +95,45 @@ class Polynomial:
         for c in reversed(self._coefficients):
             result = result * x + c
         return result
+
+    # Add coefficient by coefficient; the shorter polynomial is padded with
+    # zeros. The constructor trims any cancellation at the top.
+    def __add__(self, other: Polynomial) -> Polynomial:
+        if not isinstance(other, Polynomial):
+            return NotImplemented
+        a, b = self._coefficients, other._coefficients
+        zero = FieldElement.zero()
+        n = max(len(a), len(b))
+        return Polynomial(
+            (a[i] if i < len(a) else zero) + (b[i] if i < len(b) else zero) for i in range(n)
+        )
+
+    def __neg__(self) -> Polynomial:
+        return Polynomial(-c for c in self._coefficients)
+
+    def __sub__(self, other: Polynomial) -> Polynomial:
+        if not isinstance(other, Polynomial):
+            return NotImplemented
+        return self + (-other)
+
+    def scale(self, c: FieldElement) -> Polynomial:
+        """Multiply every coefficient by the field element c."""
+        return Polynomial(c * a for a in self._coefficients)
+
+    # Schoolbook multiplication. The coefficient of X^k in f * g is
+    #
+    #     sum over i + j = k of f_i * g_j
+    #
+    # Intuition: every term of f meets every term of g, and X^i * X^j lands
+    # in slot i + j. Cost is (deg f + 1)(deg g + 1) field multiplications.
+    def __mul__(self, other: Polynomial) -> Polynomial:
+        if not isinstance(other, Polynomial):
+            return NotImplemented
+        if self.is_zero() or other.is_zero():
+            return Polynomial.zero()
+        a, b = self._coefficients, other._coefficients
+        out = [FieldElement.zero()] * (len(a) + len(b) - 1)
+        for i, ai in enumerate(a):
+            for j, bj in enumerate(b):
+                out[i + j] = out[i + j] + ai * bj
+        return Polynomial(out)

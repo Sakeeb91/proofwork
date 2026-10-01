@@ -101,3 +101,62 @@ def test_evaluation_matches_naive_sum_of_powers():
     for i, c in enumerate(p.coefficients):
         naive = naive + c * x**i
     assert p(x) == naive
+
+
+# --- ring operations -------------------------------------------------------
+
+
+def test_addition_by_hand():
+    assert poly(1, 2) + poly(3, 4, 5) == poly(4, 6, 5)
+
+
+def test_addition_can_lower_the_degree():
+    # (1 + X) + (1 - X) = 2
+    assert poly(1, 1) + poly(1, -1) == poly(2)
+
+
+def test_subtracting_a_polynomial_from_itself_gives_zero():
+    p = rand_poly(8)
+    assert p - p == Polynomial.zero()
+    assert p + (-p) == Polynomial.zero()
+
+
+def test_multiplication_by_hand():
+    # (1 + X)(1 - X) = 1 - X^2
+    assert poly(1, 1) * poly(1, -1) == poly(1, 0, -1)
+
+
+def test_multiplying_by_zero_gives_zero():
+    assert rand_poly(5) * Polynomial.zero() == Polynomial.zero()
+    assert Polynomial.zero() * rand_poly(5) == Polynomial.zero()
+
+
+def test_degree_of_product_is_sum_of_degrees():
+    # Holds because F_p has no zero divisors: leading coefficients multiply
+    # to something nonzero.
+    a, b = rand_poly(7), rand_poly(11)
+    assert (a * b).degree() == 18
+
+
+def test_ring_laws_on_random_polynomials():
+    for _ in range(10):
+        a, b, c = rand_poly(5), rand_poly(6), rand_poly(4)
+        assert a + b == b + a
+        assert a * b == b * a
+        assert (a + b) + c == a + (b + c)
+        assert (a * b) * c == a * (b * c)
+        assert a * (b + c) == a * b + a * c
+
+
+def test_evaluation_is_a_ring_homomorphism():
+    # Evaluating then combining equals combining then evaluating. This is
+    # why a polynomial identity can be spot-checked at a random point.
+    a, b = rand_poly(9), rand_poly(6)
+    x = F(rng.randrange(P))
+    assert (a + b)(x) == a(x) + b(x)
+    assert (a * b)(x) == a(x) * b(x)
+
+
+def test_scaling_by_a_field_element():
+    assert poly(1, 2, 3).scale(F(2)) == poly(2, 4, 6)
+    assert poly(1, 2, 3).scale(F(0)) == Polynomial.zero()
