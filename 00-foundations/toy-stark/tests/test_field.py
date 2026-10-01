@@ -120,3 +120,97 @@ def test_subtraction_undoes_addition():
     for _ in range(50):
         a, b = rand_elem(), rand_elem()
         assert (a + b) - b == a
+
+
+# --- multiplication --------------------------------------------------------
+
+
+def test_multiplication_wraps_around_the_modulus():
+    # (p - 1) is -1, and (-1) * (-1) = 1.
+    assert FieldElement(P - 1) * FieldElement(P - 1) == FieldElement.one()
+
+
+def test_one_is_multiplicative_identity():
+    for _ in range(50):
+        a = rand_elem()
+        assert a * FieldElement.one() == a
+
+
+def test_multiplication_is_commutative_and_associative():
+    for _ in range(50):
+        a, b, c = rand_elem(), rand_elem(), rand_elem()
+        assert a * b == b * a
+        assert (a * b) * c == a * (b * c)
+
+
+def test_multiplication_distributes_over_addition():
+    for _ in range(50):
+        a, b, c = rand_elem(), rand_elem(), rand_elem()
+        assert a * (b + c) == a * b + a * c
+
+
+# --- inverse and division --------------------------------------------------
+
+
+def test_inverse_times_self_is_one():
+    for _ in range(50):
+        a = rand_nonzero()
+        assert a * a.inverse() == FieldElement.one()
+
+
+def test_inverse_agrees_with_extended_euclid():
+    # Python's pow(a, -1, p) uses the extended Euclidean algorithm, an
+    # independent route to the same answer.
+    for _ in range(50):
+        a = rand_nonzero()
+        assert a.inverse().value == pow(a.value, -1, P)
+
+
+def test_zero_has_no_inverse():
+    with pytest.raises(ZeroDivisionError):
+        FieldElement.zero().inverse()
+
+
+def test_division_undoes_multiplication():
+    for _ in range(50):
+        a, b = rand_elem(), rand_nonzero()
+        assert (a * b) / b == a
+
+
+def test_division_by_zero_raises():
+    with pytest.raises(ZeroDivisionError):
+        FieldElement(7) / FieldElement.zero()
+
+
+# --- powers ----------------------------------------------------------------
+
+
+def test_pow_matches_repeated_multiplication():
+    a = rand_elem()
+    acc = FieldElement.one()
+    for n in range(20):
+        assert a**n == acc
+        acc = acc * a
+
+
+def test_anything_to_the_zero_is_one():
+    assert FieldElement(5) ** 0 == FieldElement.one()
+    assert FieldElement.zero() ** 0 == FieldElement.one()  # empty product
+
+
+def test_fermats_little_theorem():
+    # a^(p-1) = 1 for every nonzero a.
+    for _ in range(50):
+        assert rand_nonzero() ** (P - 1) == FieldElement.one()
+
+
+def test_negative_exponent_is_power_of_the_inverse():
+    for _ in range(20):
+        a = rand_nonzero()
+        assert a**-1 == a.inverse()
+        assert a**-3 == (a.inverse()) ** 3
+
+
+def test_zero_to_a_negative_power_raises():
+    with pytest.raises(ZeroDivisionError):
+        FieldElement.zero() ** -1

@@ -43,6 +43,14 @@ class FieldElement:
         """Additive identity: a + 0 = a."""
         return FieldElement(0)
 
+    @staticmethod
+    def one() -> FieldElement:
+        """Multiplicative identity: a * 1 = a."""
+        return FieldElement(1)
+
+    def is_zero(self) -> bool:
+        return self._value == 0
+
     def __repr__(self) -> str:
         return f"FieldElement({self._value})"
 
@@ -72,3 +80,54 @@ class FieldElement:
         if not isinstance(other, FieldElement):
             return NotImplemented
         return FieldElement(self._value - other._value)
+
+    # (a * b) mod p. Python integers never overflow, so we can multiply
+    # first and reduce after. In a fast implementation the product needs
+    # 64 bits, which is one reason a 32-bit prime is convenient.
+    def __mul__(self, other: FieldElement) -> FieldElement:
+        if not isinstance(other, FieldElement):
+            return NotImplemented
+        return FieldElement(self._value * other._value)
+
+    # a^n by square-and-multiply. Write n in binary, n = sum of b_i * 2^i:
+    #
+    #     a^n = product over i with b_i = 1 of a^(2^i)
+    #
+    # Intuition: squaring repeatedly gives a, a^2, a^4, a^8, ... for free,
+    # and we multiply together the ones the binary digits of n select. That
+    # costs about log2(n) multiplications instead of n, which is what makes
+    # an exponent like p - 2 (about 3 billion) affordable.
+    def __pow__(self, exponent: int) -> FieldElement:
+        if not isinstance(exponent, int):
+            return NotImplemented
+        if exponent < 0:
+            # a^(-n) := (a^-1)^n
+            return self.inverse() ** (-exponent)
+        result = FieldElement.one()
+        square = self  # holds a^(2^i) at step i
+        while exponent > 0:
+            if exponent & 1:
+                result = result * square
+            square = square * square
+            exponent >>= 1
+        return result
+
+    # Fermat's little theorem: for prime p and a != 0,
+    #
+    #     a^(p-1) = 1   so   a * a^(p-2) = 1   so   a^-1 = a^(p-2)
+    #
+    # Intuition: the p - 1 nonzero elements form a group under
+    # multiplication, and raising any group element to the size of the
+    # group gives the identity. The other standard route is the extended
+    # Euclidean algorithm (Python's pow(a, -1, p)); the tests check that
+    # both agree.
+    def inverse(self) -> FieldElement:
+        if self.is_zero():
+            raise ZeroDivisionError("0 has no multiplicative inverse in F_p")
+        return self ** (P - 2)
+
+    # a / b := a * b^-1.
+    def __truediv__(self, other: FieldElement) -> FieldElement:
+        if not isinstance(other, FieldElement):
+            return NotImplemented
+        return self * other.inverse()
