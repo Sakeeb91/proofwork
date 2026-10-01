@@ -22,7 +22,7 @@ A STARK turns "I ran this computation correctly" into "this function is a polyno
 
 1. Run the computation and record every step. That list is the **trace**. Ours is FibonacciSq: a_0 = 1, a_1 = 3141592, a_{n+2} = a_{n+1}^2 + a_n^2, 1023 entries.
 2. Pick 1023 points g^0, ..., g^1022 where g generates a subgroup G of size 1024. Find the unique polynomial f of degree at most 1022 with f(g^i) = a_i. That is **interpolation**.
-3. Evaluate f on a much larger set (8192 points) that is disjoint from G. That is the **low-degree extension**. It is a Reed-Solomon codeword: two different polynomials of degree below 1023 agree on at most 1022 of the 8192 points, so distinct low-degree polynomials differ on at least 87.5% of the domain. The extension alone catches nothing, because the verifier has no reference polynomial to compare with. The payoff comes in week 4: a trace that breaks the recurrence yields a quotient that is far from every low-degree polynomial, and the low-degree test (FRI) detects that with a few random queries.
+3. Evaluate f on a much larger set (8192 points) that is disjoint from G. That is the **low-degree extension**. It is a Reed-Solomon codeword: two different polynomials of degree below 1023 agree on at most 1022 of the 8192 points, so two distinct valid codewords differ on at least 7170 of 8192 positions (87.5%). That bound is only about arrays that really are evaluations of polynomials of degree below 1023. An arbitrary dishonest array can differ from an honest one at a single position. So the extension alone catches nothing: the verifier has no reference polynomial, and nothing yet forces the prover's array to be a codeword. Commitments (week 3), constraint checks and the low-degree test (week 4) supply that. The payoff comes in week 4: a trace that breaks the recurrence yields a quotient that is far from every low-degree polynomial, and the low-degree test (FRI) detects that with a few random queries.
 
 Reference values, all read from the STARK 101 Part 1 notebook (public copy at https://github.com/fxfactorial/stark101/blob/master/tutorial/Stark101-part1.ipynb, official page https://starkware.co/stark-101/) and recomputed locally on 2026-10-01:
 
@@ -153,6 +153,13 @@ git push
 ---
 
 ## Part B: Python polynomials
+
+### Task B0: correct ADR 002's description of TLA+
+
+**Files:** modify `docs/decisions/002-lean-for-maths-tla-for-wallet.md`.
+
+- [ ] **Step 1:** In Context, replace the TLA+ sentence with: "TLA+ (https://lamport.azurewebsites.net/tla/tla.html) is a language for specifying systems as state machines. Its model checker, TLC, checks invariants over the reachable states of a specification." In Decision, replace the bullet beginning "Do not use TLA+ for the STARK" with: "Do not use TLA+ for the toy STARK now. This is a scope choice, not a claim that it could not help: the properties this track cares about (field facts, polynomial degree, soundness of FRI) are mathematical statements, which is Lean's territory. A state-machine model of a prover or verifier implementation could still be worth checking later."
+- [ ] **Step 2:** Commit as "Correct ADR 002: TLA+ vs TLC, and soften the reason for deferring it" and push.
 
 ### Task B1: ADR 003, polynomial representation
 
@@ -402,8 +409,8 @@ class Polynomial:
     #     c_0 + c_1 x + c_2 x^2 + c_3 x^3 = c_0 + x (c_1 + x (c_2 + x c_3))
     #
     # Intuition: work from the highest coefficient down, multiplying by x
-    # once per step. That is d multiplications instead of computing every
-    # power of x separately.
+    # once per step. That is one multiplication per coefficient instead of
+    # computing every power of x separately.
     def __call__(self, x: FieldElement) -> FieldElement:
         if not isinstance(x, FieldElement):
             raise TypeError(f"can only evaluate at a FieldElement, got {type(x).__name__}")
@@ -578,6 +585,12 @@ def test_exact_division_recovers_the_factor():
     assert (a * b) % b == Polynomial.zero()
 
 
+def test_floor_division_and_mod_with_nonzero_remainder():
+    # X^2 + 1 = (X - 1)(X + 1) + 2
+    assert poly(1, 0, 1) // poly(-1, 1) == poly(1, 1)
+    assert poly(1, 0, 1) % poly(-1, 1) == poly(2)
+
+
 def test_division_by_zero_polynomial_raises():
     with pytest.raises(ZeroDivisionError):
         divmod(rand_poly(3), Polynomial.zero())
@@ -633,7 +646,7 @@ def test_remainder_theorem():
         return divmod(self, other)[1]
 ```
 
-- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 74 passed.
+- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 75 passed.
 - [ ] **Step 5: Commit** as "Add polynomial division with remainder" and push.
 
 ### Task B5: domains (subgroups and cosets)
@@ -742,7 +755,7 @@ def coset(offset: FieldElement, n: int) -> list[FieldElement]:
     return [offset * x for x in subgroup(n)]
 ```
 
-- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 82 passed.
+- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 83 passed.
 - [ ] **Step 5: Commit** as "Add subgroup and coset evaluation domains" and push.
 
 ### Task B6: vanishing polynomial and Lagrange interpolation
@@ -765,6 +778,11 @@ def test_vanishing_polynomial_is_zero_on_its_points_and_has_their_count_as_degre
 
 def test_vanishing_polynomial_of_no_points_is_one():
     assert vanishing_polynomial([]) == poly(1)
+
+
+def test_vanishing_polynomial_rejects_repeated_points():
+    with pytest.raises(ValueError):
+        vanishing_polynomial([F(1), F(1)])
 
 
 def test_vanishing_polynomial_of_a_subgroup_is_x_to_the_n_minus_one():
@@ -826,10 +844,16 @@ def test_interpolation_rejects_mismatched_lengths():
 def vanishing_polynomial(points: Iterable[FieldElement]) -> Polynomial:
     """Z(X) = product of (X - x_i): the monic polynomial that is zero exactly on the points.
 
-    Intuition: each factor (X - x_i) kills one point. "f is zero on all of
-    these points" is the same statement as "Z divides f", which turns many
-    separate checks into a single divisibility check.
+    Intuition: each factor (X - x_i) kills one point. For distinct points,
+    "f is zero on all of these points" is the same statement as "Z divides
+    f", which turns many separate checks into a single divisibility check.
+
+    The points must be distinct. With a repeat the equivalence fails:
+    (X - 1)^2 does not divide X - 1, although X - 1 is zero at 1.
     """
+    points = list(points)
+    if len(set(points)) != len(points):
+        raise ValueError("points must be distinct")
     z = Polynomial.constant(FieldElement.one())
     for x in points:
         z = z * Polynomial([-x, FieldElement.one()])
@@ -868,7 +892,7 @@ def interpolate(xs: Sequence[FieldElement], ys: Sequence[FieldElement]) -> Polyn
     return result
 ```
 
-- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 92 passed.
+- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 94 passed.
 - [ ] **Step 5: Commit** as "Add vanishing polynomial and Lagrange interpolation" and push.
 
 ### Task B7: ADR 004, follow STARK 101's FibonacciSq statement
@@ -907,8 +931,8 @@ instance.
 - Our intermediate values can be compared with the notebook's asserts:
   a_1022 = 2338775057 and f(2) = 1302089273.
 - The recurrence has degree 2, so the constraint polynomials in later weeks
-  have higher degree than plain Fibonacci would give. That is the point of
-  the tutorial's choice: it exercises the degree bookkeeping.
+  have higher degree than plain Fibonacci would give. For this project that
+  is a benefit: it exercises the degree bookkeeping.
 - "Fibonacci" in the roadmap should be read as FibonacciSq.
 - The notebook's SHA-256 checks are not reproduced: they hash StarkWare's
   own string formatting of field elements.
@@ -928,7 +952,7 @@ instance.
 import pytest
 
 from toy_stark.domain import coset, subgroup
-from toy_stark.field import FieldElement
+from toy_stark.field import P, FieldElement
 from toy_stark.fibonacci import (
     A1,
     BLOWUP,
@@ -1010,6 +1034,15 @@ def test_low_degree_extension_determines_the_polynomial():
     assert interpolate(domain[10:17], values[10:17]) == f
 
 
+def test_low_degree_extension_rejects_a_domain_too_small_for_the_degree():
+    # With size <= deg f the values no longer determine f, so it is not an
+    # extension of anything.
+    f = trace_polynomial(fibonacci_sq_trace(F(2), 7), subgroup(8))
+    assert f.degree() >= 4
+    with pytest.raises(ValueError):
+        low_degree_extension(f, 4)
+
+
 # --- full size: STARK 101's numbers ----------------------------------------
 
 
@@ -1025,17 +1058,34 @@ def test_full_trace_polynomial_matches_stark101_at_2(full_trace_polynomial):
     assert f(F(2)) == F(1302089273)  # assert from the STARK 101 notebook
 
 
-def test_full_trace_polynomial_reproduces_the_trace(full_trace_polynomial):
+def test_full_trace_polynomial_reproduces_the_whole_trace(full_trace_polynomial):
+    # Every one of the 1023 points, not a sample: a polynomial that is right
+    # on a sample and wrong elsewhere must not pass.
     a, f = full_trace_polynomial
     G = subgroup(1024)
-    assert all(f(G[i]) == a[i] for i in range(0, 1023, 73))
+    assert [f(G[i]) for i in range(1023)] == a
 
 
-def test_full_low_degree_extension_has_8192_points(full_trace_polynomial):
+def horner_mod_p(coefficients: list[int], x: int) -> int:
+    """Evaluate with plain integers, independently of Polynomial.__call__."""
+    acc = 0
+    for c in reversed(coefficients):
+        acc = (acc * x + c) % P
+    return acc
+
+
+def test_full_low_degree_extension_matches_independent_evaluation(full_trace_polynomial):
     _, f = full_trace_polynomial
     domain, values = low_degree_extension(f, 1024 * BLOWUP)
     assert len(domain) == len(values) == len(set(domain)) == 8192
-    assert values[0] == f(FieldElement.generator())
+    # Domain order: domain[i] = 5 * h^i, h the generator proved in Lean.
+    h = 1734477367
+    assert all(domain[i].value == 5 * pow(h, i, P) % P for i in range(8192))
+    # Values: checked against integer arithmetic at indices spread over the
+    # whole array, including both ends.
+    coeffs = [c.value for c in f.coefficients]
+    for i in [*range(0, 8192, 97), 8191]:
+        assert values[i].value == horner_mod_p(coeffs, domain[i].value)
 ```
 
 - [ ] **Step 2: Run and watch it fail.** Expected: `No module named 'toy_stark.fibonacci'`.
@@ -1061,9 +1111,11 @@ verifier can spot-check:
 
 Intuition for step 3: it is an error-correcting code. Two different
 polynomials of degree <= 1022 agree on at most 1022 of the 8192 points, so
-they differ on at least 87.5% of them. Nothing is checked yet: the verifier
-has no reference polynomial. The distance is what a later step (the FRI
-low-degree test) relies on to catch a bad trace with a few random queries.
+they differ on at least 87.5% of them. That bound is about valid codewords
+only: an arbitrary array of 8192 values can differ from an honest one in a
+single place. Nothing is checked yet. Later steps (a commitment, constraint
+checks, and the FRI low-degree test) force the prover's array to be close to
+a codeword, and only then does the distance catch a bad trace.
 """
 
 from __future__ import annotations
@@ -1106,16 +1158,25 @@ def low_degree_extension(
 ) -> tuple[list[FieldElement], list[FieldElement]]:
     """Evaluate f on the coset g * H, |H| = size, g the field generator.
 
-    Returns (domain, values) with values[i] = f(domain[i]). The coset is
-    used instead of H itself so that the evaluation domain shares no point
-    with the trace domain; later weeks divide by polynomials that vanish on
-    the trace domain.
+    Returns (domain, values) with values[i] = f(domain[i]).
+
+    Why a coset: later weeks divide by polynomials that vanish on the trace
+    domain, so the evaluation domain must avoid it. That holds when the
+    trace domain lies in a subgroup G contained in H and H is a proper
+    subgroup: then g is not in H (a generator lies in no proper subgroup),
+    so g * H and H are disjoint. This function does not check where the
+    trace domain was; with the STARK 101 sizes (G of 1024 inside H of 8192)
+    the condition holds.
+
+    Requires deg f < size, so that the values determine f.
     """
+    if f.degree() >= size:
+        raise ValueError(f"degree {f.degree()} polynomial is not determined by {size} values")
     domain = coset(FieldElement.generator(), size)
     return domain, [f(x) for x in domain]
 ```
 
-- [ ] **Step 4: Run and measure.** `uv run pytest -q --durations=5`. Expected: 104 passed. Record the wall time of the three full-size tests.
+- [ ] **Step 4: Run and measure.** `uv run pytest -q --durations=5`. Expected: 107 passed. Record the wall time of the three full-size tests.
 
 - [ ] **Step 5: Apply the speed rule.** If the whole suite takes more than 10 seconds, mark the three full-size tests with `@pytest.mark.slow`, and change `pyproject.toml` to:
 
@@ -1183,3 +1244,33 @@ evaluations 2.3 s.
 | 5 | No test for `__call__` rejecting a non-FieldElement. | Fixed: test added, expected counts raised by one from Task B2 on. |
 | 6 | Codex script path hardcodes the plugin version. | Fixed: path resolved with a glob. |
 | 7 | Test name said "exactly" but checks one non-root. | Fixed: renamed. |
+
+
+### Plan review 2: Codex, 2026-10-01
+
+Requested: GPT 6.1 at high effort. The Codex account rejected `gpt-6.1-sol`
+(the configured default), `gpt-6.1` and `gpt-6.1-codex` with "model is not
+supported when using Codex with a ChatGPT account". The review ran on
+`gpt-6-astra` at high effort, read-only, the newest model the account
+lists. It identified itself as "GPT-6, operating as Codex".
+
+Method: ran the plan's Python in memory, compared all 8192 evaluation
+values with independent integer arithmetic, compiled the Lean proofs.
+Confirmed without change: Lean Tasks A1 and A2, Python arithmetic, test
+counts, performance (interpolation 2.1 s, full extension 2.4 s).
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | Full-size tests accept wrong results: only f(2) and 15 trace points constrain the interpolant, and only the first extension value is checked. A constructed wrong polynomial passes. | Fixed: all 1023 trace points checked; extension checked for domain order and against integer Horner at 86 spread indices. |
+| 2 | Reed-Solomon distance presented as a cheating-detection argument. It holds only between two valid codewords; an arbitrary array can differ in one place. | Fixed: both texts now condition the bound on codewords and name what is still missing. |
+| 3 | `vanishing_polynomial` claims "vanishes on the points iff Z divides f" but accepts repeated points, where it is false. | Fixed: duplicates raise `ValueError`, docstring states the condition, test added. |
+| 4 | `low_degree_extension` claims disjointness from the trace domain that the API cannot guarantee, and does not require deg f < size. | Fixed: docstring states the sufficient condition and that it is not checked; deg f >= size raises, test added. |
+| 5 | "The group must have power-of-two size" is false. | Already fixed after review 1. |
+| 6a | ADR 004 attributes intent to the tutorial authors without a source. | Fixed: stated as a benefit for this project. |
+| 6b | Horner comment says d multiplications; the code does d + 1. | Fixed: comment says one per coefficient. |
+| 6c | ADR 002 conflates TLA+ with its model checker TLC and overstates why TLA+ does not fit a STARK. | Fixed: new Task B0 amends ADR 002. |
+| 7 | `//` is only tested on exact division. | Fixed: test with nonzero remainder added. |
+| 8 | Each interpolation division inverts the leading coefficient 1 of a monic divisor: 1023 avoidable exponentiations. | Not changed. A special case for monic divisors would obscure the long-division code, and measured interpolation time is about 2 s. |
+| 9 | Could not fetch the fork's notebook to confirm the cited asserts. | No change. The notebook was fetched earlier in this session and the asserts (a_1022, f(2)) were read from it; review 1 also confirmed the degree convention in `polynomial.py`. |
+
+Expected test counts after both reviews: 58, 67, 75, 83, 94, 107.
