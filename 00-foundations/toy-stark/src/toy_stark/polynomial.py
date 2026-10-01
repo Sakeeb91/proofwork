@@ -137,3 +137,39 @@ class Polynomial:
             for j, bj in enumerate(b):
                 out[i + j] = out[i + j] + ai * bj
         return Polynomial(out)
+
+    # Long division. Given a and b != 0, find q and r with
+    #
+    #     a = q * b + r,   deg r < deg b
+    #
+    # Intuition: the same procedure as long division of integers. Cancel
+    # the leading term of what is left by subtracting the right multiple of
+    # b, record that multiple in q, repeat until what is left has smaller
+    # degree than b. Dividing by b's leading coefficient is where we need a
+    # field: over the integers this step can fail.
+    def __divmod__(self, other: Polynomial) -> tuple[Polynomial, Polynomial]:
+        if not isinstance(other, Polynomial):
+            return NotImplemented
+        if other.is_zero():
+            raise ZeroDivisionError("division by the zero polynomial")
+        b = other._coefficients
+        lead_inv = b[-1].inverse()
+        remainder = list(self._coefficients)
+        quotient = [FieldElement.zero()] * max(len(remainder) - len(b) + 1, 0)
+        # shift is the power of X in the current quotient term.
+        for shift in range(len(remainder) - len(b), -1, -1):
+            factor = remainder[shift + len(b) - 1] * lead_inv
+            quotient[shift] = factor
+            for j, bj in enumerate(b):
+                remainder[shift + j] = remainder[shift + j] - factor * bj
+        return Polynomial(quotient), Polynomial(remainder)
+
+    def __floordiv__(self, other: Polynomial) -> Polynomial:
+        if not isinstance(other, Polynomial):
+            return NotImplemented
+        return divmod(self, other)[0]
+
+    def __mod__(self, other: Polynomial) -> Polynomial:
+        if not isinstance(other, Polynomial):
+            return NotImplemented
+        return divmod(self, other)[1]

@@ -160,3 +160,60 @@ def test_evaluation_is_a_ring_homomorphism():
 def test_scaling_by_a_field_element():
     assert poly(1, 2, 3).scale(F(2)) == poly(2, 4, 6)
     assert poly(1, 2, 3).scale(F(0)) == Polynomial.zero()
+
+
+# --- division with remainder -----------------------------------------------
+
+
+def test_division_by_hand():
+    # X^2 - 1 = (X - 1)(X + 1) + 0
+    q, r = divmod(poly(-1, 0, 1), poly(-1, 1))
+    assert q == poly(1, 1)
+    assert r == Polynomial.zero()
+
+
+def test_division_with_nonzero_remainder_by_hand():
+    # X^2 + 1 = (X - 1)(X + 1) + 2
+    q, r = divmod(poly(1, 0, 1), poly(-1, 1))
+    assert q == poly(1, 1)
+    assert r == poly(2)
+
+
+def test_division_identity_and_remainder_degree():
+    # a = q * b + r with deg r < deg b. Existence and uniqueness of (q, r)
+    # is the division theorem for polynomials over a field.
+    for _ in range(20):
+        a, b = rand_poly(rng.randrange(0, 15)), rand_poly(rng.randrange(0, 8))
+        q, r = divmod(a, b)
+        assert a == q * b + r
+        assert r.degree() < b.degree()
+
+
+def test_dividing_a_lower_degree_polynomial_gives_zero_quotient():
+    a, b = rand_poly(3), rand_poly(5)
+    assert divmod(a, b) == (Polynomial.zero(), a)
+
+
+def test_exact_division_recovers_the_factor():
+    a, b = rand_poly(6), rand_poly(4)
+    assert (a * b) // b == a
+    assert (a * b) % b == Polynomial.zero()
+
+
+def test_floor_division_and_mod_with_nonzero_remainder():
+    # X^2 + 1 = (X - 1)(X + 1) + 2
+    assert poly(1, 0, 1) // poly(-1, 1) == poly(1, 1)
+    assert poly(1, 0, 1) % poly(-1, 1) == poly(2)
+
+
+def test_division_by_zero_polynomial_raises():
+    with pytest.raises(ZeroDivisionError):
+        divmod(rand_poly(3), Polynomial.zero())
+
+
+def test_remainder_theorem():
+    # f(X) mod (X - a) is the constant f(a). So f(a) = 0 exactly when
+    # (X - a) divides f. Constraints in a STARK are checked this way.
+    f = rand_poly(12)
+    a = F(rng.randrange(P))
+    assert f % poly(-a.value, 1) == Polynomial.constant(f(a))
