@@ -11,4 +11,4 @@ Needs `elan` (https://github.com/leanprover/elan). From `02-lean/ToyStark/`:
 
 | File | Proves | Python counterpart |
 |---|---|---|
-| `ToyStark/Field.lean` | p = 3 * 2^30 + 1 is prime; `ZMod P` is a field; 5 has order p - 1; 5^((p-1)/n) has order n | `toy_stark/field.py`, `tests/test_field.py` |
+| `ToyStark/Field.lean` | p = 3 * 2^30 + 1 is prime; `ZMod P` is a field; 5 has order p - 1; for n dividing p - 1, 5^((p-1)/n) has order n | `toy_stark/field.py`, `tests/test_field.py` |
