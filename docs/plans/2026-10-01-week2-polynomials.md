@@ -1274,3 +1274,21 @@ counts, performance (interpolation 2.1 s, full extension 2.4 s).
 | 9 | Could not fetch the fork's notebook to confirm the cited asserts. | No change. The notebook was fetched earlier in this session and the asserts (a_1022, f(2)) were read from it; review 1 also confirmed the degree convention in `polynomial.py`. |
 
 Expected test counts after both reviews: 58, 67, 75, 83, 94, 107.
+
+### Implementation review: Codex, 2026-10-01
+
+Diff `e2390f2..be66752`, `gpt-6-astra` at high effort, read-only, run
+through the plugin's `task` command because `review` cannot select a model.
+Verdict: no implementation correctness bugs. It ran the suite, mutated the
+code in memory to probe the tests, and rebuilt the Lean project.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | The full-size extension test checked 86 of 8192 values; adding one to `values[8190]` passed. | Fixed: all 8192 values compared with integer Horner. |
+| 2 | The degree-guard test did not cover deg f = size; changing `>=` to `>` passed. | Fixed: boundary cases added. Confirmed the new test fails under that mutation. |
+| 3 | `02-lean/README.md` stated the root-order theorem without "n divides p - 1". | Fixed. |
+
+Execution notes: every task ran test first and matched the expected counts
+(58, 67, 75, 83, 94, 107). The Lean proof compiled as written. The suite
+takes about 5 s, under the 10 s rule, so no `slow` marker was added.
+All plan tasks are complete.
