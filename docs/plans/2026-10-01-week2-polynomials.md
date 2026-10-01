@@ -22,7 +22,7 @@ A STARK turns "I ran this computation correctly" into "this function is a polyno
 
 1. Run the computation and record every step. That list is the **trace**. Ours is FibonacciSq: a_0 = 1, a_1 = 3141592, a_{n+2} = a_{n+1}^2 + a_n^2, 1023 entries.
 2. Pick 1023 points g^0, ..., g^1022 where g generates a subgroup G of size 1024. Find the unique polynomial f of degree at most 1022 with f(g^i) = a_i. That is **interpolation**.
-3. Evaluate f on a much larger set (8192 points) that is disjoint from G. That is the **low-degree extension**. It is a Reed-Solomon codeword: two different polynomials of degree below 1023 agree on at most 1022 of the 8192 points, so a prover who cheats anywhere is wrong almost everywhere, and a few random queries catch it.
+3. Evaluate f on a much larger set (8192 points) that is disjoint from G. That is the **low-degree extension**. It is a Reed-Solomon codeword: two different polynomials of degree below 1023 agree on at most 1022 of the 8192 points, so distinct low-degree polynomials differ on at least 87.5% of the domain. The extension alone catches nothing, because the verifier has no reference polynomial to compare with. The payoff comes in week 4: a trace that breaks the recurrence yields a quotient that is far from every low-degree polynomial, and the low-degree test (FRI) detects that with a few random queries.
 
 Reference values, all read from the STARK 101 Part 1 notebook (public copy at https://github.com/fxfactorial/stark101/blob/master/tutorial/Stark101-part1.ipynb, official page https://starkware.co/stark-101/) and recomputed locally on 2026-10-01:
 
@@ -286,6 +286,11 @@ def test_evaluation_by_hand():
     assert poly(1, 2, 3)(F(2)) == F(17)
 
 
+def test_evaluation_point_must_be_a_field_element():
+    with pytest.raises(TypeError):
+        poly(1, 2)(3)
+
+
 def test_evaluating_zero_polynomial_gives_zero():
     assert Polynomial.zero()(F(5)) == F(0)
 
@@ -372,9 +377,12 @@ class Polynomial:
     def degree(self) -> int:
         """Index of the highest nonzero coefficient.
 
-        The zero polynomial gets -1. That keeps deg(f * g) = deg f + deg g
-        from being claimed for zero, and makes "deg r < deg b" a valid stop
-        condition in division when the remainder is zero.
+        The zero polynomial gets -1. That keeps degree() equal to
+        len(coefficients) - 1, matches STARK 101, and makes "deg r < deg b"
+        a valid stop condition in division when the remainder is zero. The
+        price: deg(f * g) = deg f + deg g only holds when neither factor is
+        zero. (The convention that keeps the rule for zero too is
+        deg 0 = minus infinity.)
         """
         return len(self._coefficients) - 1
 
@@ -405,7 +413,7 @@ class Polynomial:
         return result
 ```
 
-- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: all pass (44 old + 13 new = 57).
+- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: all pass (44 old + 14 new = 58).
 - [ ] **Step 5: Commit** both files as "Add Polynomial over F_p with degree, equality, Horner evaluation" and push.
 
 ### Task B3: addition, negation, subtraction, multiplication
@@ -522,7 +530,7 @@ def test_scaling_by_a_field_element():
         return Polynomial(out)
 ```
 
-- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 66 passed.
+- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 67 passed.
 - [ ] **Step 5: Commit** as "Add polynomial addition, subtraction, scaling, multiplication" and push.
 
 ### Task B4: division with remainder
@@ -625,7 +633,7 @@ def test_remainder_theorem():
         return divmod(self, other)[1]
 ```
 
-- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 73 passed.
+- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 74 passed.
 - [ ] **Step 5: Commit** as "Add polynomial division with remainder" and push.
 
 ### Task B5: domains (subgroups and cosets)
@@ -707,9 +715,9 @@ A coset is that subgroup multiplied through by a fixed nonzero element c:
 
     c * H = {c, c w, c w^2, ..., c w^(n-1)}
 
-Intuition: H is n equally spaced points on a circle, and c * H is the same
-circle rotated and scaled so that (when c is outside H) it shares no point
-with H. STARKs put the trace on a subgroup and the low-degree extension on a
+Intuition: F_p^* is a single cycle of p - 1 points, g^0, g^1, ..., g^(p-2).
+H is every ((p-1)/n)-th point on that cycle, and c * H is the same pattern
+shifted along the cycle, so (when c is outside H) it shares no point with H. STARKs put the trace on a subgroup and the low-degree extension on a
 coset of a larger subgroup.
 """
 
@@ -734,7 +742,7 @@ def coset(offset: FieldElement, n: int) -> list[FieldElement]:
     return [offset * x for x in subgroup(n)]
 ```
 
-- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 81 passed.
+- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 82 passed.
 - [ ] **Step 5: Commit** as "Add subgroup and coset evaluation domains" and push.
 
 ### Task B6: vanishing polynomial and Lagrange interpolation
@@ -747,7 +755,7 @@ def coset(offset: FieldElement, n: int) -> list[FieldElement]:
 # --- vanishing polynomial --------------------------------------------------
 
 
-def test_vanishing_polynomial_is_zero_exactly_on_its_points():
+def test_vanishing_polynomial_is_zero_on_its_points_and_has_their_count_as_degree():
     points = [F(3), F(10), F(77)]
     z = vanishing_polynomial(points)
     assert z.degree() == 3
@@ -860,7 +868,7 @@ def interpolate(xs: Sequence[FieldElement], ys: Sequence[FieldElement]) -> Polyn
     return result
 ```
 
-- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 91 passed.
+- [ ] **Step 4: Run and watch it pass.** `uv run pytest -q`. Expected: 92 passed.
 - [ ] **Step 5: Commit** as "Add vanishing polynomial and Lagrange interpolation" and push.
 
 ### Task B7: ADR 004, follow STARK 101's FibonacciSq statement
@@ -1053,7 +1061,9 @@ verifier can spot-check:
 
 Intuition for step 3: it is an error-correcting code. Two different
 polynomials of degree <= 1022 agree on at most 1022 of the 8192 points, so
-an incorrect trace gives values that are wrong at more than 87% of them.
+they differ on at least 87.5% of them. Nothing is checked yet: the verifier
+has no reference polynomial. The distance is what a later step (the FRI
+low-degree test) relies on to catch a bad trace with a few random queries.
 """
 
 from __future__ import annotations
@@ -1082,8 +1092,9 @@ def trace_polynomial(trace: list[FieldElement], domain: list[FieldElement]) -> P
     """The polynomial f with f(domain[i]) = trace[i].
 
     The trace may be shorter than the domain. STARK 101 uses 1023 values on
-    a domain of 1024: the group must have power-of-two size, and the
-    recurrence only produces 1023 values we care about.
+    a domain of 1024. Any subgroup size dividing p - 1 would work for
+    interpolation; a power of two is chosen because FRI halves the domain
+    each round, and 1024 is the smallest one that holds 1023 values.
     """
     if len(trace) > len(domain):
         raise ValueError(f"trace of length {len(trace)} does not fit a domain of {len(domain)}")
@@ -1104,7 +1115,7 @@ def low_degree_extension(
     return domain, [f(x) for x in domain]
 ```
 
-- [ ] **Step 4: Run and measure.** `uv run pytest -q --durations=5`. Expected: 103 passed. Record the wall time of the three full-size tests.
+- [ ] **Step 4: Run and measure.** `uv run pytest -q --durations=5`. Expected: 104 passed. Record the wall time of the three full-size tests.
 
 - [ ] **Step 5: Apply the speed rule.** If the whole suite takes more than 10 seconds, mark the three full-size tests with `@pytest.mark.slow`, and change `pyproject.toml` to:
 
@@ -1134,7 +1145,8 @@ Then verify both `uv run pytest -q` (fast suite) and `uv run pytest -q -m slow` 
 - [ ] **Step 1:** Run the Codex review against the base commit:
 
 ```bash
-node "/Users/sakeeb/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs" review --wait --scope branch --base e2390f23d50979ab17015ac58a92418bc76c3c07
+CODEX=$(ls -d "$HOME"/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs | tail -1)
+node "$CODEX" review --wait --scope branch --base e2390f23d50979ab17015ac58a92418bc76c3c07
 ```
 
 - [ ] **Step 2:** For each finding: reproduce it with a failing test, fix, commit, push. Findings that are wrong get a one-line reason.
@@ -1149,4 +1161,25 @@ node "/Users/sakeeb/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex
 
 ## Reviews
 
-(Filled in during plan review and after implementation.)
+### Plan review 1: Fable (Claude subagent, model `fable`), 2026-10-01
+
+Method: compiled the Task A1 proof in a scratch file against the repo's
+Mathlib, and transcribed the Python into a prototype and ran it. Verdict:
+nothing blocking.
+
+Confirmed without change: the Lean proof compiles as written with only the
+standard axioms; all four reference values reproduce; edge cases (zero
+polynomial, constant divisor, empty interpolation) behave; test counts were
+right; task ordering has no forward dependencies. Measured on this machine:
+vanishing polynomial of 1023 points 0.3 s, interpolation 2.0 s, 8192
+evaluations 2.3 s.
+
+| # | Finding | Disposition |
+|---|---|---|
+| 1 | `degree()` docstring claimed -1 preserves deg(fg) = deg f + deg g. It does the opposite. | Fixed: docstring rewritten. |
+| 2 | Background and `fibonacci.py` docstring implied random queries on the extension catch cheating. The verifier has no reference polynomial; the distance property pays off only with the low-degree test. | Fixed: both reworded to point at FRI in week 4. |
+| 3 | `trace_polynomial` docstring said the group must have power-of-two size. Only "divides p - 1" is required. | Fixed. |
+| 4 | Coset described as a circle "rotated and scaled"; F_p has no magnitude. | Fixed: described as a shift along the cycle of F_p^*. |
+| 5 | No test for `__call__` rejecting a non-FieldElement. | Fixed: test added, expected counts raised by one from Task B2 on. |
+| 6 | Codex script path hardcodes the plugin version. | Fixed: path resolved with a glob. |
+| 7 | Test name said "exactly" but checks one non-root. | Fixed: renamed. |
