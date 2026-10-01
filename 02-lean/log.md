@@ -44,3 +44,35 @@ Where the AI failed or guessed wrong:
 
 Not done yet:
 - Primitive roots of unity (`w_n = 5^((p-1)/n)` has order n) in Lean.
+
+## 2026-10-01: roots of unity, w_n = 5^((p-1)/n) has order n
+
+- Target: `ToyStark.orderOf_rootOfUnity` for every n dividing p - 1, plus
+  `g_trace_value` and `h_eval_value` (the STARK 101 domain generators), in
+  `ToyStark/ToyStark/Field.lean`.
+- Model: Claude Opus 5.5 (`claude-opus-5-5`) in Claude Code. The proof was
+  reviewed before execution by a Fable subagent and by Codex
+  (`gpt-6-astra`); both compiled it independently.
+- Toolchain: Lean `v4.35.0-rc3`, Mathlib `v4.35.0-rc3`.
+- Result: builds with no `sorry`. `#print axioms` on all three shows only
+  `propext`, `Classical.choice`, `Quot.sound`.
+
+What worked:
+- Stating the theorem with `sorry` first and building, then proving.
+- `orderOf_pow'` (order of x^k is order(x) / gcd(order(x), k)), which is
+  stated for monoids, so it applies to `ZMod P` under multiplication
+  without passing to the unit group. Then `orderOf_five`,
+  `Nat.gcd_eq_right`, `Nat.div_div_self`.
+- The proof written in the plan compiled on the first build.
+- Checking each lemma's section in the Mathlib source first. There is also
+  an unprimed `orderOf_pow` further down the file, proved via
+  `isOfFinOrder_of_finite`; its exact hypotheses were not checked, so the
+  primed monoid version was used.
+
+Where the AI failed or guessed wrong:
+- Nothing failed in this session. The risk that did not materialise: the
+  hypothesis `(P - 1) / n ≠ 0` needed by `orderOf_pow'` is easy to forget.
+
+Not done yet:
+- Polynomials over `ZMod P` in Lean (Mathlib has `Polynomial`); no Lean
+  mirror of week 2 exists.
