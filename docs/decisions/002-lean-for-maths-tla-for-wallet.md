@@ -11,16 +11,19 @@ proof of it. Mathlib (https://github.com/leanprover-community/mathlib4)
 already contains the algebra the toy STARK rests on, for example the ring
 `ZMod n` of integers mod n.
 
-TLA+ (https://lamport.azurewebsites.net/tla/tla.html) specifies state
-machines and model-checks invariants over every interleaving of their steps.
+TLA+ (https://lamport.azurewebsites.net/tla/tla.html) is a language for
+specifying systems as state machines. Its model checker, TLC, checks
+invariants over the reachable states of a specification.
 
 ## Decision
 - Use Lean 4 with Mathlib for mathematical facts behind
   `00-foundations/toy-stark`. Each week of the toy STARK gets a Lean mirror
   of its key facts, in a Lake project at `02-lean/ToyStark/`.
-- Do not use TLA+ for the STARK. The prover and verifier exchange messages
-  in a fixed order, so there are no interleavings for a model checker to
-  explore.
+- Do not use TLA+ for the toy STARK now. This is a scope choice, not a
+  claim that it could not help: the properties this track cares about
+  (field facts, polynomial degree, soundness of FRI) are mathematical
+  statements, which is Lean's territory. A state-machine model of a prover
+  or verifier implementation could still be worth checking later.
 - Reserve TLA+ for `03-agent-wallet`, whose core claim (spending never
   exceeds the limit under any ordering of requests) is a state-machine
   invariant. That track is parked, so no TLA+ is written now.
