@@ -16,8 +16,8 @@ What worked:
   primality and `orderOf_eq_of_pow_and_pow_div_prime`
   (`Mathlib/GroupTheory/OrderOfElement.lean`) for the generator. Both take
   the same two hypotheses, so one pair of lemmas feeds both theorems.
-- `reduce_mod_char` proves `(5 : ZMod P) ^ n = c` for n around 3 * 10^9 in
-  well under a second. It needs the modulus as a numeric literal, so `P` is
+- `reduce_mod_char` proves `(5 : ZMod P) ^ n = c` for n around 3 * 10^9 quickly:
+  the whole file builds in about 3 seconds. It needs the modulus as a numeric literal, so `P` is
   an `abbrev` for `3221225473` with a separate lemma `P = 3 * 2^30 + 1`.
 - For `x ≠ 1`: first rewrite the power to its value with an equality proved
   by `reduce_mod_char`, then `decide` on two reduced numerals.

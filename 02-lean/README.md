@@ -6,7 +6,7 @@
 ## Running the Lean proofs
 Needs `elan` (https://github.com/leanprover/elan). From `02-lean/ToyStark/`:
 
-    lake exe cache get   # download prebuilt Mathlib, a few GB, once
+    lake exe cache get   # download prebuilt Mathlib, about 7 GB on disk, once
     lake build
 
 | File | Proves | Python counterpart |
