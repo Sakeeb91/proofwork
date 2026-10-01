@@ -1,0 +1,11 @@
+id:
+project:
+proof_system:        # e.g. Groth16, PLONK, STARK, zkVM
+language:            # circom, noir, halo2, rust...
+bug_class:           # under-constrained, missing range check, Fiat-Shamir, field overflow...
+severity:
+disclosed_date:
+sources: []
+vulnerable_commit:
+fixed_commit:
+split:               # pre_cutoff | post_cutoff (relative to each model evaluated)

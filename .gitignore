@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.lake/
+01-soundbench/results/raw/
+01-soundbench/disclosures/
