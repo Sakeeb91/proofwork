@@ -4,8 +4,9 @@ import random
 
 import pytest
 
+from toy_stark.domain import subgroup
 from toy_stark.field import P, FieldElement
-from toy_stark.polynomial import Polynomial
+from toy_stark.polynomial import Polynomial, interpolate, vanishing_polynomial
 
 rng = random.Random(1)
 
@@ -217,3 +218,74 @@ def test_remainder_theorem():
     f = rand_poly(12)
     a = F(rng.randrange(P))
     assert f % poly(-a.value, 1) == Polynomial.constant(f(a))
+
+
+# --- vanishing polynomial --------------------------------------------------
+
+
+def test_vanishing_polynomial_is_zero_on_its_points_and_has_their_count_as_degree():
+    points = [F(3), F(10), F(77)]
+    z = vanishing_polynomial(points)
+    assert z.degree() == 3
+    assert all(z(x) == F(0) for x in points)
+    assert z(F(4)) != F(0)
+
+
+def test_vanishing_polynomial_of_no_points_is_one():
+    assert vanishing_polynomial([]) == poly(1)
+
+
+def test_vanishing_polynomial_rejects_repeated_points():
+    with pytest.raises(ValueError):
+        vanishing_polynomial([F(1), F(1)])
+
+
+def test_vanishing_polynomial_of_a_subgroup_is_x_to_the_n_minus_one():
+    # Every element of the size-n subgroup satisfies x^n = 1, so X^n - 1
+    # has those n roots, and a monic degree-n polynomial with n known roots
+    # is determined. A product of n linear factors collapses to two terms.
+    n = 16
+    expected = Polynomial([F(-1)] + [F(0)] * (n - 1) + [F(1)])
+    assert vanishing_polynomial(subgroup(n)) == expected
+
+
+# --- interpolation ---------------------------------------------------------
+
+
+def test_interpolation_through_two_points_is_the_line():
+    # Through (0, 1) and (1, 3): f = 1 + 2X.
+    assert interpolate([F(0), F(1)], [F(1), F(3)]) == poly(1, 2)
+
+
+def test_interpolant_passes_through_every_point():
+    xs = [F(i) for i in range(1, 21)]
+    ys = [F(rng.randrange(P)) for _ in xs]
+    f = interpolate(xs, ys)
+    assert all(f(x) == y for x, y in zip(xs, ys))
+    assert f.degree() < len(xs)
+
+
+def test_interpolation_recovers_a_polynomial_from_its_values():
+    # Uniqueness: a polynomial of degree < n is determined by n values.
+    f = rand_poly(11)
+    xs = subgroup(16)[:12]
+    assert interpolate(xs, [f(x) for x in xs]) == f
+
+
+def test_interpolating_constant_values_gives_a_constant():
+    xs = subgroup(8)
+    assert interpolate(xs, [F(7)] * 8) == poly(7)
+
+
+def test_interpolating_no_points_gives_zero():
+    assert interpolate([], []) == Polynomial.zero()
+
+
+def test_interpolation_rejects_repeated_x_values():
+    with pytest.raises(ValueError):
+        interpolate([F(1), F(1)], [F(2), F(3)])
+
+
+def test_interpolation_rejects_mismatched_lengths():
+    with pytest.raises(ValueError):
+        interpolate([F(1), F(2)], [F(3)])

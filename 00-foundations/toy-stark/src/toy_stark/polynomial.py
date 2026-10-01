@@ -16,7 +16,7 @@ easy-to-spot difference.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from toy_stark.field import FieldElement
 
@@ -173,3 +173,54 @@ class Polynomial:
         if not isinstance(other, Polynomial):
             return NotImplemented
         return divmod(self, other)[1]
+
+
+def vanishing_polynomial(points: Iterable[FieldElement]) -> Polynomial:
+    """Z(X) = product of (X - x_i): the monic polynomial that is zero exactly on the points.
+
+    Intuition: each factor (X - x_i) kills one point. For distinct points,
+    "f is zero on all of these points" is the same statement as "Z divides
+    f", which turns many separate checks into a single divisibility check.
+
+    The points must be distinct. With a repeat the equivalence fails:
+    (X - 1)^2 does not divide X - 1, although X - 1 is zero at 1.
+    """
+    points = list(points)
+    if len(set(points)) != len(points):
+        raise ValueError("points must be distinct")
+    z = Polynomial.constant(FieldElement.one())
+    for x in points:
+        z = z * Polynomial([-x, FieldElement.one()])
+    return z
+
+
+def interpolate(xs: Sequence[FieldElement], ys: Sequence[FieldElement]) -> Polynomial:
+    """The unique polynomial of degree < n through the n points (x_i, y_i).
+
+    Lagrange's formula:
+
+        f(X) = sum over i of  y_i * L_i(X),
+        L_i(X) = product over j != i of (X - x_j) / (x_i - x_j)
+
+    Intuition: L_i is built to be 1 at x_i and 0 at every other x_j, so the
+    sum picks out y_i at x_i. It is a "one-hot" basis for the points.
+
+    Computed in O(n^2) instead of the O(n^3) of multiplying out each L_i:
+    with Z(X) = product over all j of (X - x_j),
+
+        numerator of L_i    =  Z(X) / (X - x_i)   =: Q_i(X)
+        denominator of L_i  =  Q_i(x_i)
+
+    so Z is built once and each point costs one division by a linear factor.
+    """
+    if len(xs) != len(ys):
+        raise ValueError(f"need as many y values as x values, got {len(xs)} and {len(ys)}")
+    if len(set(xs)) != len(xs):
+        raise ValueError("x values must be distinct")
+
+    z = vanishing_polynomial(xs)
+    result = Polynomial.zero()
+    for x, y in zip(xs, ys):
+        q = z // Polynomial([-x, FieldElement.one()])
+        result = result + q.scale(y / q(x))
+    return result
